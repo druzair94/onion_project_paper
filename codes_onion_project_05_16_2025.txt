@@ -1,0 +1,1710 @@
+rm(list = ls(all.names = TRUE))
+
+library(agricolae)
+library(broom)
+library(cowplot)
+library(caret)
+library(DescTools)
+library(DiagrammeR)
+library(dplyr)
+library(emmeans)
+library(ggplot2)
+library(ggpmisc)
+library(ggpubr)
+library(ggrepel)
+library(ggthemes)
+library(gridExtra)
+library(htmlwidgets)
+library(lme4)
+library(lsmeans)
+library(lubridate)
+library(multcomp)
+library(multcompView)
+library(openxlsx)
+library(outliers)
+library(officer)
+library(patchwork)
+library(plotly)
+library(purrr)
+library(RColorBrewer)
+library(readr)
+library(readxl)
+library(reshape2)
+library(scales)
+library(stats)
+library(tidyverse)
+library(writexl)
+
+# YIELD - GRAPH 1a - BAR CHART - ANALYZED ON LONG TABLE
+# Read data from the Excel file
+yield_bar_charts_data <- read_excel("z_delete_yield_LAI.xlsx", sheet = "Yield_without_outliers")
+
+# Create a new variable for water potential (kPa)
+yield_bar_charts_data <- yield_bar_charts_data %>%
+  mutate(Water_Potential = case_when(
+    Treatment %in% c(1, 2, 3) ~ "-25 kPa",
+    Treatment %in% c(4, 5, 6) ~ "-50 kPa",
+    Treatment %in% c(7, 8, 9) ~ "-75 kPa",
+    Treatment %in% c(10, 11, 12) ~ "-100 kPa",
+    TRUE ~ NA_character_
+  ))
+
+# Reorder Water_Potential factor levels to ensure proper sequence in the plot
+yield_bar_charts_data$Water_Potential <- factor(yield_bar_charts_data$Water_Potential,
+                                                levels = c("-25 kPa", "-50 kPa", "-75 kPa", "-100 kPa"))
+
+# Calculate the mean and standard error for adjusted_yield_ha
+yield_bar_charts_data_summary <- yield_bar_charts_data %>%
+  group_by(Water_Potential, Variety) %>%
+  summarise(
+    mean_yield = mean(adjusted_yield_ha, na.rm = TRUE),  # Calculate mean of adjusted_yield_ha
+    se_yield = sd(adjusted_yield_ha, na.rm = TRUE) / sqrt(n())  # Calculate standard error
+  ) %>%
+  ungroup()
+
+# Create the bar graph with error bars and a more professional color scheme
+ggplot(yield_bar_charts_data_summary, aes(x = Water_Potential, y = mean_yield, fill = Variety)) +
+  geom_bar(stat = "identity", position = "dodge", width = 0.7) +  # Adjust bar width if necessary
+  geom_errorbar(aes(ymin = mean_yield - se_yield, ymax = mean_yield + se_yield),
+                position = position_dodge(0.7),  # Align error bars with bars
+                width = 0.4, color = "black", size = 0.75) +  # Increased error bar line thickness (size argument)
+  labs(title = "",
+       x = "Treatments",
+       y = "Adjusted Yield / ha") +
+  scale_fill_manual(values = c("Hornet" = "#4C72B0",  # Soft blue (professional and neutral)
+                               "MataHari" = "#DD6E1F",  # Muted orange (warm, but not too bright)
+                               "Amadea" = "#6E8B3D")) +  # Olive green (professional and subdued)
+  theme_minimal() +
+  theme(
+    legend.title = element_text(face = "bold", size = 18),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 16, colour = "black"),  # Rotate x-axis labels if needed
+    axis.text.y = element_text(size = 18, colour = "black"),
+    axis.title.x = element_text(size = 18, face = "bold", colour = "black"),
+    axis.title.y = element_text(size = 18, face = "bold", colour = "black"),
+    plot.title = element_text(size = 18, colour = "black"),
+    strip.text = element_text(size = 22, face = "bold", colour = "black")
+  )
+##################################################################### #
+
+# YIELD - GRAPH 1b - BAR CHART - ANALYZED ON AVERAGES - ERROR BARS
+#could not get error bars due to less number of observations in the Averages Table
+##################################################################### #
+
+# YIELD CHARACTERISTICS - BAR CHART
+# Read the data from the Excel file
+#bar_chart_data <- read_excel("z_delete_yield_LAI.xlsx", sheet = "Averages_without_outliers")
+
+# Reshape data to long format
+#data_long <- pivot_longer(bar_chart_data, 
+#cols = c(small_bulb_wt_percent, small_bulb_number_percent,
+#medium_bulb_wt_percent, medium_bulb_number_percent,
+#large_bulb_wt_percent, large_bulb_number_percent,
+#jumbo_bulb_wt_percent, jumbo_bulb_number_percent,
+#single_center_percent),
+#names_to = "Characteristic", 
+#values_to = "Value")
+
+# Calculate mean and standard error
+#summary_data <- data_long %>%
+#group_by(Treatment, Characteristic) %>%
+#summarise(mean_value = mean(Value, na.rm = TRUE),
+#se_value = sd(Value, na.rm = TRUE) / sqrt(n()), .groups = 'drop')
+
+# Factor levels for Treatment
+#summary_data$Treatment <- factor(summary_data$Treatment, 
+#levels = c("25_kPa", "50_kPa", "50_kPa_WM", "75_kPa", "100_kPa", "125_kPa"))
+
+# Create the bar chart with error bars
+#ggplot(summary_data, aes(x = Treatment, y = mean_value, fill = Characteristic)) +
+#geom_bar(stat = "identity", position = position_dodge(), width = 0.7) +
+#geom_errorbar(aes(ymin = mean_value - se_value, ymax = mean_value + se_value),
+#position = position_dodge(0.7), width = 0.2) +  # Add error bars
+#labs(title = "", 
+#x = "Treatments", 
+#y = "%", 
+#fill = "Yield Characteristics") + 
+#theme_minimal(base_size = 14) +  
+#theme(
+#axis.text.x = element_text(angle = 45, hjust = 1, size = 18, color = "black"),
+#axis.title.x = element_text(size = 18, face = "bold", color = "black"),
+#axis.title.y = element_text(size = 18, face = "bold", color = "black"),
+#axis.text.y = element_text(size = 18, color = "black")
+#) +
+#scale_fill_brewer(palette = "Set1") +  # Use a color palette
+#scale_y_continuous(breaks = c(0, 25, 50, 75, 100), 
+#limits = c(0, 100))  # Add y-axis breaks at intervals of 25
+##################################################################### #
+
+### YIELD - LSD SIGNIFICANT VALUES ###
+# Read the Excel file
+yield_lsd_data <- read_excel("z_delete_yield_LAI.xlsx", sheet = "Yield_without_outliers")
+
+# Calculate means of adjusted_yield_ha and bulbs_ac for each Treatment
+mean_yields <- yield_lsd_data %>%
+  group_by(Treatment) %>%
+  summarize(
+    mean_yield = format(round(mean(adjusted_yield_ha, na.rm = TRUE), 2), nsmall = 2),  
+    #mean_bulbs_ac = format(round(mean(bulbs_ac, na.rm = TRUE), 2), nsmall = 2),
+    mean_small_bulb_wt_percent = format(round(mean(small_bulb_wt_percent, na.rm = TRUE), 2), nsmall = 2),
+    mean_small_bulb_number_percent = format(round(mean(small_bulb_number_percent, na.rm = TRUE), 2), nsmall = 2),
+    mean_medium_bulb_wt_percent = format(round(mean(medium_bulb_wt_percent, na.rm = TRUE), 2), nsmall = 2),
+    mean_medium_bulb_number_percent = format(round(mean(medium_bulb_number_percent, na.rm = TRUE), 2), nsmall = 2),
+    mean_large_bulb_wt_percent = format(round(mean(large_bulb_wt_percent, na.rm = TRUE), 2), nsmall = 2),
+    mean_large_bulb_number_percent = format(round(mean(large_bulb_number_percent, na.rm = TRUE), 2), nsmall = 2),
+    mean_jumbo_bulb_wt_percent = format(round(mean(jumbo_bulb_wt_percent, na.rm = TRUE), 2), nsmall = 2),
+    mean_jumbo_bulb_number_percent = format(round(mean(jumbo_bulb_number_percent, na.rm = TRUE), 2), nsmall = 2),
+    mean_single_center_percent = format(round(mean(single_center_percent, na.rm = TRUE), 2), nsmall = 2)
+  )
+
+# Print the mean results
+print(mean_yields)
+
+# Perform LSD test for adjusted_yield_ha
+# Ensure your data has the necessary structure for analysis
+# Assume adjusted_yield_ha is the response variable
+# CHANGE it accordingly for other variables
+
+# Conduct ANOVA
+anova_result <- aov(adjusted_yield_ha ~ Treatment, data = yield_lsd_data)
+summary(anova_result)
+
+# Conduct LSD test
+lsd_result <- LSD.test(anova_result, "Treatment", p.adj = "none")
+
+# Print LSD results
+print(lsd_result)
+
+# Optionally, you can perform LSD tests for other variables as well
+# Just replicate the ANOVA and LSD test for each variable as needed
+##################################################################### #
+##################################################################### #
+##################################################################### #
+
+# YIELD - GRAPH 2a - BOX PLOT
+# Read the data from the Excel file
+yield_data <- read_excel("z_delete_yield_LAI.xlsx", sheet = "Yield_without_outliers")
+
+# Ensure that the variables are factors as needed
+yield_data$Treatment <- as.factor(yield_data$Treatment)
+yield_data$Variety <- as.factor(yield_data$Variety)
+
+# Fit a linear regression model
+model <- lm(adjusted_yield_ha ~ Treatment * Variety, data = yield_data)
+
+# Summarize the model
+summary(model)
+
+# Calculate means and standard errors for the plot
+summary_data <- yield_data %>%
+  group_by(Treatment, Variety) %>%
+  summarise(mean_yield = mean(adjusted_yield_ha, na.rm = TRUE),
+            se_yield = sd(adjusted_yield_ha, na.rm = TRUE) / sqrt(n()),
+            .groups = 'drop')  # Drop grouping for cleaner output
+
+# Create an advanced plot of the data
+ggplot(yield_data, aes(x = Treatment, y = adjusted_yield_ha, fill = Variety)) +
+  geom_boxplot(outlier.shape = NA, alpha = 0.7, position = position_dodge(0.8)) +  # Boxplot with transparent boxes
+  geom_point(position = position_jitterdodge(jitter.width = 0.2, dodge.width = 0.8), alpha = 0.5) +  # Jittered points
+  geom_errorbar(data = summary_data, 
+                aes(y = mean_yield, 
+                    ymin = mean_yield - se_yield, 
+                    ymax = mean_yield + se_yield, 
+                    x = Treatment),  # Ensure x is specified
+                width = 0.2, color = "black", 
+                position = position_dodge(0.8)) +  # Error bars
+  geom_point(data = summary_data, aes(x = Treatment, y = mean_yield), 
+             position = position_dodge(0.8), size = 4, shape = 21, fill = "red") +  # Mean points
+  geom_label_repel(data = summary_data, 
+                   aes(x = Treatment, y = mean_yield, label = round(mean_yield, 1)), 
+                   nudge_y = 0.5, size = 5) +  # Data labels with nudge
+  scale_fill_brewer(palette = "Set3") +  # Custom color palette
+  labs(title = "",
+       x = "Treatment",
+       y = "Yield (kg/ha)",
+       fill = "Variety") +
+  theme_minimal(base_size = 15) +
+  theme(legend.position = "right", 
+        panel.grid.major = element_line(color = "lightgray"),
+        panel.grid.minor = element_blank(),
+        text = element_text(family = "Arial"),  # Change font family if needed
+        plot.title = element_text(hjust = 0.5, size = 18, face = "bold"),  # Center title
+        axis.title.x = element_text(size = 18, face = "bold"),  # X-axis title
+        axis.title.y = element_text(size = 18, face = "bold"),  # Y-axis title
+        axis.text.x = element_text(size = 16),  # X-axis text
+        axis.text.y = element_text(size = 16))  # Y-axis text
+##################################################################### #
+
+# YIELD - GRAPH 2b - BOX PLOT
+# Read the data from the Excel file
+interactive_yield_data <- read_excel("z_delete_yield_LAI.xlsx", sheet = "Yield_without_outliers")
+
+# Ensure that the variables are factors as needed
+interactive_yield_data$Treatment <- as.factor(interactive_yield_data$Treatment)
+interactive_yield_data$Variety <- as.factor(interactive_yield_data$Variety)
+
+# Fit a linear regression model
+model <- lm(adjusted_yield_ha ~ Treatment * Variety, data = interactive_yield_data)
+
+# Summarize the model
+summary(model)
+
+# Calculate means and standard errors for the plot
+summary_data <- interactive_yield_data %>%
+  group_by(Treatment, Variety) %>%
+  summarise(mean_yield = mean(adjusted_yield_ha, na.rm = TRUE),
+            se_yield = sd(adjusted_yield_ha, na.rm = TRUE) / sqrt(n()),
+            .groups = 'drop')  # Drop grouping for cleaner output
+
+# Create an advanced plot of the data with facets
+p <- ggplot(interactive_yield_data, aes(x = Treatment, y = adjusted_yield_ha, fill = Variety)) +
+  geom_boxplot(outlier.shape = NA, alpha = 0.7, position = position_dodge(0.8)) +  # Boxplot
+  geom_point(position = position_jitterdodge(jitter.width = 0.2, dodge.width = 0.8), alpha = 0.5) +  # Jittered points
+  geom_errorbar(data = summary_data, 
+                aes(y = mean_yield, 
+                    ymin = mean_yield - se_yield, 
+                    ymax = mean_yield + se_yield),  
+                width = 0.2, color = "black", 
+                position = position_dodge(0.8)) +  # Error bars
+  geom_point(data = summary_data, aes(x = Treatment, y = mean_yield), 
+             position = position_dodge(0.8), size = 4, shape = 21, fill = "red") +  # Mean points
+  labs(title = "",
+       x = "Treatment",
+       y = "Yield (kg/ha)",
+       fill = "Variety") +
+  scale_fill_brewer(palette = "Set3") +  # Custom color palette
+  theme_minimal(base_size = 15) +
+  theme(legend.position = "right", 
+        panel.grid.major = element_line(color = "lightgray"),
+        panel.grid.minor = element_blank(),
+        text = element_text(family = "Arial"),  # Change font family if needed
+        plot.title = element_text(hjust = 0.5, size = 18, face = "bold"),  # Center title
+        axis.title.x = element_text(size = 18, face = "bold"),  # X-axis title
+        axis.title.y = element_text(size = 18, face = "bold"),  # Y-axis title
+        axis.text.x = element_text(size = 18),  # X-axis text
+        axis.text.y = element_text(size = 18))  # Y-axis text
+
+# Convert to an interactive plot
+interactive_plot <- ggplotly(p)
+
+# Save the interactive plot as an HTML file
+saveWidget(interactive_plot, "Yield.html")
+##################################################################### #
+
+# YIELD - GRAPH 3 - LINE GRAPH
+# Need to make the file for "AVERAGES"
+# Read the data from the specified Excel file and sheet
+line_graph_data <- read_excel("z_delete_yield_LAI.xlsx", sheet = "Averages_without_outliers")
+
+# Check the structure of the data
+str(line_graph_data)
+
+# Ensure the Treatment and Variety columns are factors
+line_graph_data$Treatment <- factor(line_graph_data$Treatment)
+line_graph_data$Variety <- factor(line_graph_data$Variety)
+
+# Generate mean values and standard error for plotting (change yield_kg_ha to adj_yield_kg_ha)
+data_summary <- line_graph_data %>%
+  group_by(Treatment, Variety) %>%
+  summarise(mean_yield = mean(adj_yield_ha, na.rm = TRUE), 
+            se_yield = sd(adj_yield_ha, na.rm = TRUE) / sqrt(n()), 
+            .groups = 'drop')
+
+# Calculate correlation coefficients for each Variety
+correlations <- data_summary %>%
+  group_by(Variety) %>%
+  summarise(correlation = cor(as.numeric(Treatment), mean_yield), .groups = 'drop')
+
+# Fit a linear model for the mean yield against Treatment
+lm_model <- lm(mean_yield ~ as.numeric(Treatment) + Variety, data = data_summary)
+coeffs <- coef(lm_model)
+
+# Create the equation string
+equation <- paste0("y = ", round(coeffs[2], 2), " * x + ", 
+                   round(coeffs[3], 2), " + ", 
+                   round(coeffs[1], 2))
+
+# Calculate total number of observations
+total_n <- nrow(line_graph_data)
+
+# Create the line plot with enhancements (use adj_yield_kg_ha for the plot)
+p <- ggplot(data_summary, aes(x = Treatment, y = mean_yield, color = Variety, group = Variety)) +
+  geom_line(size = 1) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_yield - se_yield, ymax = mean_yield + se_yield), 
+                width = 0.2, size = 0.5) +
+  geom_text(aes(label = round(mean_yield, 1)), 
+            vjust = 1.5, size = 3, position = position_dodge(width = 0.4)) +
+  labs(title = "",
+       x = "Treatment",
+       y = "Adjusted Yield (kg/ha)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 18, color = "black"), 
+        axis.text.y = element_text(size = 18, color = "black"), 
+        axis.title.x = element_text(size = 18, color = "black"), 
+        axis.title.y = element_text(size = 18, color = "black"), 
+        legend.position = "right", 
+        legend.title = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = 16, color = "black")) +
+  scale_x_discrete(limits = c("25_kPa", "50_kPa", "75_kPa", "100_kPa")) +
+  scale_y_continuous(breaks = c(30000, 60000, 90000, 120000, 150000), limits = c(30000, 150000)) +
+  scale_color_brewer(palette = "Set1") +
+  annotate("text", x = 1.5, y = 150000, label = equation, size = 5, color = "black") +
+  annotate("text", x = 1.1, y = 145000, label = paste("Total n =", total_n), size = 5, color = "black")  # Total number of observations
+
+# Define colors for each variety
+correlations <- correlations %>%
+  mutate(color = case_when(
+    Variety == "Amadea" ~ "red",
+    Variety == "Hornet" ~ "blue",
+    Variety == "MataHari" ~ "green"
+  ))
+
+# Create a y position for each R value based on the variety
+y_position <- seq(140000, 135000, length.out = nrow(correlations))
+
+# Add R values to the plot with respective colors for the R coefficients
+p + geom_text(data = correlations, aes(x = 0.9, y = y_position, 
+                                       label = paste("R =", round(correlation, 2), sep = " ")), 
+              size = 5, hjust = 0, color = correlations$color)  # Use the color defined in the correlations data frame
+##################################################################### #
+##################################################################### #
+##################################################################### #
+
+#LAI
+# Load the data from the Excel file
+LAI_data <- read_excel("z_delete_yield_LAI.xlsx", sheet = "LAI_without_outliers")
+
+# Filter the data for the specified varieties and treatments
+lai_filtered_data <- LAI_data %>%
+  filter(Variety %in% c("Hornet", "MataHari", "Amadea"),
+         Treatment %in% c("25_kPa", "50_kPa", "50_kPa_water_mark", "75_kPa", "100_kPa", "125_kPa"),
+         Date >= as.Date("2024-02-23") & Date <= as.Date("2024-04-07"))
+
+# Ensure the Date column is of Date type
+lai_filtered_data$Date <- as.Date(lai_filtered_data$Date)
+
+# Count the number of observations
+n_observations <- nrow(lai_filtered_data)
+print(paste("Number of observations:", n_observations))
+
+# Create a regression model (you can adjust the formula as needed)
+model <- lm(LAI ~ Variety * Treatment * Date, data = lai_filtered_data)
+
+# Summary of the regression model
+summary(model)
+
+# Convert Treatment to a factor with specified levels
+lai_filtered_data$Treatment <- factor(lai_filtered_data$Treatment, 
+                                      levels = c("25_kPa", "50_kPa", "50_kPa_water_mark", "75_kPa", "100_kPa", "125_kPa"))
+
+# Convert Date to numeric for regression
+lai_filtered_data$Date_numeric <- as.numeric(lai_filtered_data$Date)
+
+# Create a vector of custom treatment names
+treatment_labels <- c("25_kPa" = "-25 kPa", 
+                      "50_kPa" = "-50 kPa", 
+                      "50_kPa_water_mark" = "-50 kPa (Water Mark)", 
+                      "75_kPa" = "-75 kPa", 
+                      "100_kPa" = "-100 kPa", 
+                      "125_kPa" = "-125 kPa")
+
+# Create the plot with dark colors for varieties
+ggplot(lai_filtered_data, aes(x = Date_numeric, y = LAI, shape = Variety, color = Variety)) +
+  geom_line(size = 1.2) +
+  geom_point(size = 4) +
+  scale_x_continuous(breaks = as.numeric(unique(lai_filtered_data$Date)), 
+                     labels = unique(lai_filtered_data$Date)) + 
+  scale_y_continuous(breaks = c(0.00, 0.50, 1.00, 1.50), limits = c(0, 1.50)) +
+  labs(title = "",
+       x = "Date",
+       y = "LAI",
+       color = "Variety",
+       shape = "Variety") +
+  theme_minimal(base_size = 16) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 16, color = "black"), 
+    axis.text.y = element_text(size = 16, color = "black"), 
+    axis.title.x = element_text(size = 16, color = "black"), 
+    axis.title.y = element_text(size = 16, color = "black"), 
+    legend.position = "bottom",
+    panel.border = element_rect(color = "black", fill = NA, size = 1),
+    strip.text = element_text(size = 18), 
+    panel.spacing = unit(2, "lines")
+  ) +
+  facet_wrap(~ Treatment, labeller = labeller(Treatment = treatment_labels)) +  # Apply custom labels
+  scale_color_manual(values = c("Hornet" = "#1b9e77", 
+                                "MataHari" = "#d95f02", 
+                                "Amadea" = "#7570b3"))
+##################################################################### #
+
+#LAI - ERROR BARS
+#could not get error bars due to less number of observations
+##################################################################### #
+
+#LAI - COEFFICIENT OF DETERMINATION (R2) VALUES
+# Load the data from the Excel file
+LAI_data <- read_excel("z_delete_yield_LAI.xlsx", sheet = "LAI_without_outliers")
+
+# Filter the data for the specified varieties and treatments
+lai_filtered_data <- LAI_data %>%
+  filter(Variety %in% c("Hornet", "MataHari", "Amadea"),
+         Treatment %in% c("25_kPa", "50_kPa", "50_kPa_water_mark", "75_kPa", "100_kPa", "125_kPa"),
+         Date >= as.Date("2024-02-23") & Date <= as.Date("2024-04-07"))
+
+# Ensure the Date column is of Date type
+lai_filtered_data$Date <- as.Date(lai_filtered_data$Date)
+
+# Calculate R-squared values for each Variety in each Treatment
+r_squared_variety_treatment <- lai_filtered_data %>%
+  group_by(Variety, Treatment) %>%
+  do({
+    # Fit a model for each Variety and Treatment combination
+    model_variety_treatment <- lm(LAI ~ Date, data = .)
+    
+    # Extract the R-squared value for the model
+    r2 <- summary(model_variety_treatment)$r.squared
+    
+    # Return the R-squared value as a data frame
+    data.frame(Variety = unique(.$Variety), 
+               Treatment = unique(.$Treatment), 
+               R2 = r2)
+  })
+
+# Print the R-squared values for each Variety and Treatment
+print(r_squared_variety_treatment)
+##################################################################### #
+
+#LAI - CORRELATION COEFFICIENT (R) VALUES
+# Load the data from the Excel file
+LAI_R_data <- read_excel("z_delete_yield_LAI.xlsx", sheet = "LAI_without_outliers")
+
+# Filter the data for the specified varieties and treatments
+r_filtered_data <- LAI_R_data %>%
+  filter(Variety %in% c("Hornet", "MataHari", "Amadea"),
+         Treatment %in% c("25_kPa", "50_kPa", "50_kPa_water_mark", "75_kPa", "100_kPa", "125_kPa"),
+         Date >= as.Date("2024-02-23") & Date <= as.Date("2024-04-07"))
+
+# Convert Treatment to a factor with specified levels
+r_filtered_data$Treatment <- factor(r_filtered_data$Treatment, 
+                                    levels = c("25_kPa", "50_kPa", "50_kPa_water_mark", "75_kPa", "100_kPa", "125_kPa"))
+
+# Convert Date to numeric for regression
+r_filtered_data$Date_numeric <- as.numeric(r_filtered_data$Date)
+
+# Calculate R and the number of observations (n) for each Variety within each Treatment
+r_values <- r_filtered_data %>%
+  group_by(Variety, Treatment) %>%
+  summarize(
+    n = n(),  # Count of observations
+    model = list(lm(LAI ~ poly(Date_numeric, 2, raw = TRUE))),
+    r = cor(LAI, Date_numeric),  # Calculate correlation coefficient within each group
+    .groups = 'drop'  # Avoids warning about grouping
+  )
+
+# Print R values and number of observations
+print(r_values)
+##################################################################### #
+
+# LAI - LSD SIGNIFICANT VALUES ON 5-DATES WITHIN EACH TREATMENT
+# Read the Excel file
+LAI_lsd_data <- read_excel("z_delete_yield_LAI.xlsx", sheet = "LAI_without_outliers")
+
+# Calculate means of LAI for each Date and Treatment
+mean_LAI <- LAI_lsd_data %>%
+  group_by(Treatment, Date) %>%
+  summarize(
+    mean_LAI = format(round(mean(LAI, na.rm = TRUE), 2), nsmall = 2)
+  )
+
+# Print the mean results
+print(mean_LAI)
+
+# Perform LSD test for LAI within each Treatment group
+# Loop over each Treatment and conduct ANOVA and LSD tests
+
+unique_treatments <- unique(LAI_lsd_data$Treatment)
+
+for (treatment in unique_treatments) {
+  
+  # Subset data for the current Treatment
+  treatment_data <- filter(LAI_lsd_data, Treatment == treatment)
+  
+  # Conduct ANOVA for LAI for the current Treatment
+  anova_result <- aov(LAI ~ Date, data = treatment_data)
+  print(paste("ANOVA Results for Treatment:", treatment))
+  print(summary(anova_result))
+  
+  # Conduct LSD test for the current Treatment
+  lsd_result <- LSD.test(anova_result, "Date", p.adj = "none")
+  print(paste("LSD Results for Treatment:", treatment))
+  print(lsd_result)
+}
+
+# Optionally, you can perform LSD tests for other variables as well
+# Just replicate the ANOVA and LSD test for each variable as needed
+##################################################################### #
+##################################################################### #
+##################################################################### #
+
+# SOIL WATER POTENTIAL (SWP) TREATMENTS - STRESS VS YIELD
+# Read the data from the Excel sheet
+data <- read_excel("zz_delete_swp_treatments.xlsx", sheet = "regressions")
+
+# Filter data to include only relevant Days (10, 20, 30, 50, 60, 74)
+filtered_data <- data %>%
+  filter(Days %in% c(10, 20, 30, 50, 60, 74))
+
+# Perform regression for each variety and day period
+regression_results <- filtered_data %>%
+  group_by(Days, Varieties) %>%
+  do(tidy(lm(yield_kg_ha ~ stress_kPa, data = .))) %>%
+  ungroup()
+
+# View the regression results (coefficients for each variety and days)
+print(regression_results)
+
+# Plot the data and regression lines
+ggplot(filtered_data, aes(x = stress_kPa, y = yield_kg_ha, color = Varieties)) +
+  geom_point(shape = 16, size = 3) +  # Points with a consistent shape
+  geom_smooth(method = "lm", se = FALSE, aes(group = interaction(Days, Varieties)), linetype = "solid") +
+  facet_wrap(~Days, scales = "free_x") +  # Facet by 'Days' with free x-axis scales for each plot
+  labs(title = "",
+       x = "Stress (kPa)",
+       y = "Yield (kg/ha)",
+       color = "Varieties") +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",  # Position the legend at the bottom
+    legend.title = element_text(size = 16, face = "bold", color = "black"),  # Larger, bold legend title
+    legend.text = element_text(size = 14, color = "black"),  # Adjusted legend text size
+    axis.title.x = element_text(size = 16, face = "bold", color = "black"),  # Bold axis title (x)
+    axis.title.y = element_text(size = 16, face = "bold", color = "black"),  # Bold axis title (y)
+    axis.text.x = element_text(size = 16, color = "black", angle = 45, hjust = 1),  # Larger, black axis text with angled x-axis labels
+    axis.text.y = element_text(size = 16, color = "black"),  # Larger, black y-axis text
+    strip.text = element_text(size = 16, color = "black", face = "bold"),  # Larger, bold facet labels
+    strip.background = element_rect(fill = "lightgray", color = "black")  # Background for facet labels
+  ) +
+  guides(shape = "none")  # Remove the legend for 'Days' period (no legend for shape)
+##################################################################### #
+
+# SOIL WATER POTENTIAL (SWP) TREATMENTS - TREATMENTS VS YIELD
+# Read the data
+data <- read_excel("zz_delete_swp_treatments.xlsx", sheet = "regressions")
+
+# Filter the data for the specified Days values (10, 20, 30, 50, 60, 74)
+filtered_data <- data %>%
+  filter(Days %in% c(10, 20, 30, 50, 60, 74))
+
+# Set the order of the 'Treatments' factor levels
+filtered_data$Treatments <- factor(filtered_data$Treatments, levels = c("25_kPa", "50_kPa", "75_kPa", "100_kPa"))
+
+# Fit regression models and store summaries separately
+model_results <- filtered_data %>%
+  group_by(Varieties) %>%
+  do({
+    model <- lm(yield_kg_ha ~ Treatments * Days, data = .)  # Fit the regression model
+    summary_model <- summary(model)  # Get the summary of the model
+    tibble(
+      model = list(model),
+      model_summary = list(summary_model)
+    )  # Store the model and its summary in a list
+  })
+
+# Plotting with ggplot
+ggplot(filtered_data, aes(x = Treatments, y = yield_kg_ha, color = Varieties)) +
+  geom_point(shape = 16, size = 4) +  # Larger points (size = 4)
+  geom_smooth(method = "lm", se = FALSE, aes(group = interaction(Varieties, Days)), size = 1.5) +  # Thicker regression lines (size = 1.5)
+  facet_wrap(~Varieties) +  # Separate plots for each variety
+  labs(title = "",
+       x = "Treatments (kPa)",
+       y = "Yield (kg/ha)",
+       color = "Variety") +  # Remove Days legend
+  theme_minimal() +
+  
+  # Customize the appearance of various text elements:
+  theme(
+    legend.title = element_text(size = 16, face = "bold", color = "black"),  # Larger, bold legend title
+    legend.text = element_text(size = 14, color = "black"),  # Adjusted legend text size
+    axis.title.x = element_text(size = 16, face = "bold", color = "black"),  # Bold axis title (x)
+    axis.title.y = element_text(size = 16, face = "bold", color = "black"),  # Bold axis title (y)
+    axis.text.x = element_text(size = 14, color = "black", angle = 45, hjust = 1),  # Larger, black axis text with angled x-axis labels
+    axis.text.y = element_text(size = 14, color = "black"),  # Larger, black y-axis text
+    strip.text = element_text(size = 14, face = "bold", color = "black"),  # Facet labels (strip) text size
+    strip.background = element_blank(),  # Optional: removes background from facet labels
+    panel.spacing = unit(1, "lines")  # Optional: adjust spacing between facet panels
+  ) +
+  
+  # Remove the legend for shape (Days)
+  guides(shape = "none")  
+##################################################################### #
+
+# SOIL WATER POTENTIAL (SWP) TREATMENTS
+# Read the Excel file
+swp_trt_data <- read_excel("zz_delete_swp_treatments.xlsx", sheet = "swp_trts_without_outliers")
+
+# Ensure Date is in the correct format
+swp_trt_data$Date <- as.Date(swp_trt_data$Date, format="%m/%d/%Y")
+
+# Filter the data to include only dates from March 2024 onwards
+swp_trt_data <- swp_trt_data %>%
+  filter(Date >= as.Date("2024-03-09"))
+
+# Reshape the data for easier plotting
+swp_trt_data_long <- swp_trt_data %>%
+  pivot_longer(cols = c("Hornet_kPa", "MataHari_kPa", "Amadea_kPa"), 
+               names_to = "Variable", 
+               values_to = "Value")
+
+# Perform regression analysis for each variable
+regression_results <- swp_trt_data_long %>%
+  group_by(Variable, Treatment) %>%
+  summarize(
+    Model = list(lm(Value ~ Date, data = cur_data())), # Fit linear model
+    .groups = 'drop'
+  )
+
+# Create a function to extract coefficients and format the equation
+get_equation <- function(model) {
+  coefs <- coefficients(model)
+  m <- coefs[2]  # Slope
+  b <- coefs[1]  # Intercept
+  return(paste("y =", round(m, 2), "* x +", round(b, 2))) # Format equation
+}
+
+# Add equations to the regression results
+regression_results <- regression_results %>%
+  mutate(Equation = map_chr(Model, get_equation)) # Get equations as strings
+
+# Define heights for each treatment
+heights <- c("25_kPa" = -100, 
+             "50_kPa" = -130, 
+             "50_kPa_water_mark" = -160, 
+             "75_kPa" = -190, 
+             "100_kPa" = -220, 
+             "125_kPa" = -250)  # Adjust heights as needed
+
+# Add a new column for equation heights
+regression_results <- regression_results %>%
+  mutate(Equation_Height = heights[Treatment])
+
+# Calculate correlation coefficients for each variable
+correlation_results <- swp_trt_data_long %>%
+  group_by(Variable, Treatment) %>%
+  summarize(
+    Correlation = cor(Value, as.numeric(Date)),  # Calculate correlation
+    .groups = 'drop'
+  )
+
+# Add the correlation results to the regression results
+regression_results <- regression_results %>%
+  left_join(correlation_results, by = c("Variable", "Treatment"))
+
+# Define darker colors for each treatment
+treatment_colors <- c("25_kPa" = "#A50000", 
+                      "50_kPa" = "#005AB5", 
+                      "50_kPa_water_mark" = "#3C6B3F", 
+                      "75_kPa" = "#FF7F00", 
+                      "100_kPa" = "#D69A00", 
+                      "125_kPa" = "#7B3F00")
+
+# Add color to regression results based on Treatment
+regression_results <- regression_results %>%
+  mutate(Color = treatment_colors[Treatment])
+
+# Plotting the Results with specific x-axis dates
+ggplot(swp_trt_data_long, aes(x = Date, y = Value, color = Treatment)) +
+  geom_point(size = 3, alpha = 0.7) +
+  geom_smooth(method = "lm", se = FALSE, aes(group = Treatment)) +
+  facet_wrap(~ Variable) +
+  scale_color_manual(values = treatment_colors) +
+  labs(title = "",
+       x = "Date",
+       y = "Soil Water Potential",
+       color = "Treatment") +
+  theme_minimal() +
+  theme(legend.position = "right", 
+        legend.title = element_text(face = "bold", size = 16), 
+        plot.title = element_text(hjust = 0.5, size = 16), 
+        axis.title.x = element_text(size = 16, color = "black"), 
+        axis.title.y = element_text(size = 16, color = "black"), 
+        axis.text.x = element_text(size = 16, color = "black"), 
+        axis.text.y = element_text(size = 16, color = "black"), 
+        strip.text = element_text(size = 16, color = "black")) +
+  geom_text(data = regression_results, 
+            aes(x = min(swp_trt_data_long$Date), 
+                y = Equation_Height, 
+                label = paste(Equation, "\nR =", round(Correlation, 2)), 
+                color = Treatment), 
+            size = 4, hjust = 0) +
+  scale_x_date(date_labels = "%m/%y", date_breaks = "1 month") + 
+  scale_y_continuous(breaks = c(0, -100, -200, -300, -400, -500, -600), 
+                     limits = c(-600, 0))
+##################################################################### #
+##################################################################### #
+##################################################################### #
+
+# SOIL WATER POTENTIAL (SWP) TEMPERATURE
+# Read the data from the Excel file
+swp_temperature_data <- read_excel("zzz_delete_swp_temperature.xlsx", sheet = "swp_temp_without_outliers")
+
+# Convert Date to Date type
+swp_temperature_data$Date <- as.Date(swp_temperature_data$Date, format="%m/%d/%Y")
+
+# Filter data for the specified date range
+filtered_data <- swp_temperature_data %>%
+  filter(Date >= as.Date("2023-12-12") & Date <= as.Date("2024-05-20"))
+
+# Convert Treatment to a factor with specified levels
+filtered_data$Treatment <- factor(filtered_data$Treatment,
+                                  levels = c("25_kPa", "50_kPa", "75_kPa", "100_kPa"))
+
+# Reshape data to long format for ggplot
+long_data <- filtered_data %>%
+  pivot_longer(cols = c(water_potential, soil_temperature_C), 
+               names_to = "Measurement", 
+               values_to = "Value")
+
+# Calculate differences for important points
+long_data <- long_data %>%
+  arrange(Date) %>%
+  group_by(Treatment, Measurement) %>%
+  mutate(Difference = Value - lag(Value))  # Calculate difference from the previous value
+
+# Identify important points
+important_points <- long_data %>%
+  filter(abs(Difference) > 30)
+
+# Identify starting values
+starting_values <- long_data %>%
+  group_by(Treatment, Measurement) %>%
+  slice(1) %>%
+  mutate(is_starting = TRUE)
+
+# Combine important points and starting values
+combined_points <- bind_rows(
+  important_points %>% mutate(is_starting = FALSE), 
+  starting_values
+)
+
+# Define the sequence of dates for the x-axis
+x_date_sequence <- seq(as.Date("2023-12-12"), as.Date("2024-05-12"), by = "1 month")
+
+# Calculate linear regression equations for each Treatment and Measurement
+regression_labels <- long_data %>%
+  group_by(Treatment, Measurement) %>%
+  summarize(
+    model = list(lm(Value ~ Date)),
+    .groups = 'drop'
+  ) %>%
+  mutate(
+    intercept = sapply(model, function(m) coef(m)[1]),
+    slope = sapply(model, function(m) coef(m)[2]),
+    equation = paste("y = ", round(intercept, 2), " + ", round(slope, 2), "x", sep = "")
+  )
+
+# Define specific positions for each Treatment's equations
+equation_positions <- data.frame(
+  Treatment = rep(levels(filtered_data$Treatment), each = 2),
+  Measurement = rep(c("water_potential", "soil_temperature_C"), times = length(levels(filtered_data$Treatment))),
+  x = as.Date("2024-01-12"),  # Updated x position
+  y = c(-100, -150)  # Updated y positions for each Measurement
+)
+
+# Define colors for each measurement
+measurement_colors <- c("water_potential" = "blue", "soil_temperature_C" = "red")
+
+# Calculate correlation coefficients for each Treatment
+correlation_labels <- long_data %>%
+  group_by(Treatment) %>%
+  summarize(
+    correlation = cor(Value[Measurement == "water_potential"], 
+                      Value[Measurement == "soil_temperature_C"], 
+                      use = "complete.obs"),
+    .groups = 'drop'
+  ) %>%
+  mutate(correlation_label = paste("R =", round(correlation, 2)))
+
+# Define specific positions for each Treatment's correlation labels
+correlation_positions <- data.frame(
+  Treatment = levels(filtered_data$Treatment),
+  x = rep(as.Date("2024-01-12"), length(levels(filtered_data$Treatment))),  # x position for the correlation label
+  y = seq(-200, -200 - (length(levels(filtered_data$Treatment)) - 1) * 10, by = -10)  # y positions for each Treatment
+)
+
+# Combine correlation positions with labels
+correlation_info <- correlation_positions %>%
+  left_join(correlation_labels, by = "Treatment")
+
+# Plot with correlation coefficients
+ggplot(long_data, aes(x = Date, y = Value, color = Measurement)) +
+  geom_line(size = 1.2) +
+  scale_color_manual(values = measurement_colors) +
+  facet_wrap(~ Treatment) +
+  labs(title = "",
+       x = "Date",
+       y = "Values",
+       color = "Measurement") +
+  scale_x_date(breaks = x_date_sequence, labels = format(x_date_sequence, "%m/%d/%Y")) +
+  theme_minimal(base_size = 15) +
+  theme(panel.grid.major = element_line(color = "grey80"),
+        panel.grid.minor = element_blank(),
+        legend.position = "bottom",
+        legend.title = element_text(size = 16, colour = "black"),
+        legend.text = element_text(size = 16, colour = "black"),
+        strip.text = element_text(size = 16, colour = "black"),
+        axis.title.x = element_text(size = 18, colour = "black"),
+        axis.title.y = element_text(size = 18, colour = "black"),
+        axis.text.x = element_text(size = 12, colour = "black"),
+        axis.text.y = element_text(size = 18, colour = "black")) +
+  geom_text(data = combined_points, 
+            aes(label = round(Value, 1), 
+                vjust = ifelse(is_starting, -1.5, ifelse(Difference > 0, -0.5, 1.5))),
+            size = 5,
+            check_overlap = TRUE) +
+  geom_text(data = equation_positions,
+            aes(x = x, y = y, 
+                label = regression_labels$equation[match(paste(Treatment, Measurement), 
+                                                         paste(regression_labels$Treatment, 
+                                                               regression_labels$Measurement))],
+                color = Measurement),
+            size = 5) +
+  geom_text(data = correlation_info,
+            aes(x = x, y = y, label = correlation_label),
+            color = "black", size = 5, vjust = -1.5) +  # Positioning of the R label
+  scale_color_manual(values = c(measurement_colors, "black"))  # Ensure black is used for any other text
+##################################################################### #
+##################################################################### #
+##################################################################### #
+
+# SWP VS TREATMENTS - SUBHAS MALLA
+# Read the data from the specified Excel file and sheet
+swp_trt_data <- read_excel("zz_delete_swp_treatments.xlsx", sheet = "processed_Sheet3")
+
+# Filter the data for Days = 10
+filtered_data <- swp_trt_data %>%
+  filter(Days == 10)
+
+# Convert Treatment to a factor with the specified levels
+filtered_data$Treatment <- factor(filtered_data$Treatment, 
+                                  levels = c("25_kPa", "50_kPa", "75_kPa", "100_kPa", "125_kPa", "50_kPa_WM"))
+
+# Create the combined dot and line chart with data labels
+ggplot(filtered_data, aes(x = Treatment)) +
+  geom_line(aes(y = Hornet_kPa, color = "Hornet_kPa"), size = 1, group = 1) +
+  geom_point(aes(y = Hornet_kPa, color = "Hornet_kPa"), size = 3) +
+  geom_text(aes(y = Hornet_kPa, label = Hornet_kPa), vjust = -1, size = 4, color = "black") +
+  
+  geom_line(aes(y = MataHari_kPa, color = "MataHari_kPa"), size = 1, group = 1) +
+  geom_point(aes(y = MataHari_kPa, color = "MataHari_kPa"), size = 3) +
+  geom_text(aes(y = MataHari_kPa, label = MataHari_kPa), vjust = -1, size = 4, color = "black") +
+  
+  geom_line(aes(y = Amadea_kPa, color = "Amadea_kPa"), size = 1, group = 1) +
+  geom_point(aes(y = Amadea_kPa, color = "Amadea_kPa"), size = 3) +
+  geom_text(aes(y = Amadea_kPa, label = Amadea_kPa), vjust = -1, size = 4, color = "black") +
+  
+  labs(title = "",
+       x = "Treatment",
+       y = "kPa",
+       color = "Legend") +
+  theme_minimal() +
+  theme(
+    axis.title.x = element_text(size = 16, face = "bold", color = "black"),
+    axis.title.y = element_text(size = 16, face = "bold", color = "black"),
+    axis.text.x = element_text(size = 16, face = "bold", color = "black"),
+    axis.text.y = element_text(size = 16, face = "bold", color = "black"),
+    legend.title = element_text(size = 16, face = "bold", color = "black"),
+    legend.text = element_text(size = 16, color = "black")
+  )
+##################################################################### #
+
+# SWP VS TREATMENTS - OUTLIERS REMOVED AND REGRESSIONS
+# Read the data from the Excel file
+regressions_data <- read_excel("zz_delete_swp_treatments.xlsx", sheet = "regressions")
+
+# Optionally filter the data based on your conditions
+filter_days <- FALSE
+days_value <- 10
+
+if (!filter_days) {
+  data_to_plot <- regressions_data
+} else {
+  data_to_plot <- regressions_data %>%
+    filter(Days == days_value)
+}
+
+# Convert Stress to numeric, if necessary
+data_to_plot$Stress <- as.numeric(as.character(data_to_plot$Stress))
+
+# Create the ggplot with specified x-axis breaks and limits
+ggplot(data_to_plot, aes(x = Stress, y = yield_kg_ha, color = Varieties, shape = Treatment)) +
+  geom_point(size = 4, stroke = 1) +  # Adjust point size and stroke
+  geom_line(aes(group = interaction(Varieties, Treatment)), size = 1) +  # Adjust line size
+  geom_text(aes(label = Stress), vjust = -0.5, size = 3, check_overlap = TRUE) +
+  labs(
+    title = "",
+    x = "Stress",
+    y = "Yield (kg/ha)",
+    color = "Varieties",
+    shape = "Treatment",
+  ) +
+  theme_classic(base_size = 14) +  # Use a classic theme with larger base font size
+  theme(
+    legend.position = "bottom",  # Position legend at the bottom
+    legend.title = element_text(face = "bold"),
+    legend.text = element_text(size = 12),
+    plot.title = element_text(hjust = 0.5, size = 18, face = "bold"),
+    axis.title.x = element_text(face = "bold"),
+    axis.title.y = element_text(face = "bold"),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 12),
+    panel.grid.major = element_line(color = "grey90"),  # Light major grid lines
+    panel.grid.minor = element_blank(),  # Remove minor grid lines
+    plot.caption = element_text(size = 10, hjust = 0)  # Align caption
+  ) +
+  scale_x_continuous(breaks = seq(-13548, -195, by = 1500), limits = c(-13548, -195)) +
+  scale_color_brewer(palette = "Dark2")  # Use a contrasting color palette
+##################################################################### #
+
+# SWP VS TREATMENTS WITH R VALUES - YIELD on X-AXIS
+# Read the data from the specified sheet into swp_trt_data
+swp_trt_data <- read_excel("zz_delete_swp_treatments.xlsx", sheet = "regressions")
+
+# Define a filter condition
+filter_days <- FALSE  # Set to TRUE to filter by Days, FALSE to include all data
+days_value <- 10      # Specify the value of Days to filter on
+
+# Apply conditional filtering
+swp_trt_data <- if (filter_days) {
+  swp_trt_data %>% filter(Days == days_value)
+} else {
+  swp_trt_data  # No filtering
+}
+
+# Convert Stress to a numeric variable if it's not already
+swp_trt_data$Stress <- as.numeric(swp_trt_data$Stress)
+
+# Calculate correlation coefficients for each variety
+correlation_results <- swp_trt_data %>%
+  group_by(Varieties) %>%
+  summarise(
+    correlation = ifelse(n() >= 2,  # Ensure there are at least 2 data points
+                         cor(yield_kg_ha, Stress, use = "complete.obs"),
+                         NA)  # Return NA if not enough data
+  )
+
+# View the correlation results
+print(correlation_results)
+
+# Create a plot with points, regression lines, and data labels
+ggplot(swp_trt_data, aes(x = yield_kg_ha, y = Stress, color = Varieties)) +
+  geom_point(size = 4) +  # Increase the size of the dots
+  geom_smooth(method = "lm", aes(group = Varieties), se = FALSE) +  # Add linear regression lines for each Variety
+  geom_text(aes(label = yield_kg_ha), hjust = -0.1, size = 4) +  # Add data labels (yield values) to the left of the points
+  labs(title = "",
+       x = "Yield (kg/ha)",
+       y = "Stress") +
+  theme_minimal() +
+  theme(
+    axis.title.x = element_text(size = 14, color = "black", face = "bold"),
+    axis.title.y = element_text(size = 14, color = "black", face = "bold"),
+    plot.title = element_text(size = 14, color = "black"),
+    axis.text.x = element_text(size = 14, color = "black"),
+    axis.text.y = element_text(size = 14, color = "black")
+  ) + 
+  scale_y_continuous(breaks = c(0, -5000, -10000, -15000), 
+                     limits = c(-15000, 0))
+##################################################################### #
+
+# SWP VS TREATMENTS WITH R VALUES - YIELD on Y-AXIS
+# Read the data from the Excel file
+data <- read_excel("zz_delete_swp_treatments.xlsx", sheet = "regressions")
+
+# Check the structure of the data
+str(data)
+
+# Ensure 'Stress' and 'Varieties' are treated as factors if they are categorical
+data$Stress <- as.numeric(as.character(data$Stress))  # Convert Stress to numeric
+data$Varieties <- as.factor(data$Varieties)           # Convert Varieties to factor
+
+# Perform linear regression analysis
+lm_model <- lm(yield_kg_ha ~ Stress + Varieties, data = data)
+
+# Summary of the regression model
+summary(lm_model)
+
+# Plotting the relationship
+ggplot(data, aes(x = Stress, y = yield_kg_ha, color = Varieties)) +
+  geom_point(size = 4) +                    # Scatter plot
+  geom_smooth(method = "lm", se = FALSE) +  # Linear regression line
+  labs(title = "",
+       x = "Stress (kPa)",
+       y = "Yield (kg/ha)") +
+  theme_minimal() +
+  theme(
+    axis.title.x = element_text(size = 14, color = "black", face = "bold"),
+    axis.title.y = element_text(size = 14, color = "black", face = "bold"),
+    plot.title = element_text(size = 14, color = "black"),
+    axis.text.x = element_text(size = 14, color = "black"),
+    axis.text.y = element_text(size = 14, color = "black")
+  )
+##################################################################### #
+##################################################################### #
+##################################################################### #
+
+# IRRIGATION NEEDED VS SOIL MOISTURE
+# Read the data from the specified Excel sheet
+soil_moisture_data <- read_excel("zzzzz_delete_irrigation.xlsx", sheet = "soil_moisture_without_outliers")
+
+# Ensure Date is in Date format
+soil_moisture_data$Date <- as.Date(soil_moisture_data$Date, format = "%m/%d/%Y")
+
+# Filter out rows where soil_moisture_m3_m3_VWC is 0.00 and between 0.24 and 0.38
+filtered_data <- soil_moisture_data %>%
+  filter(soil_moisture_m3_m3_VWC != 0.00 & 
+           soil_moisture_m3_m3_VWC >= 0.24 & 
+           soil_moisture_m3_m3_VWC <= 0.38)
+
+# Define thresholds for soil moisture and temperature
+moisture_threshold <- 0.30  # Adjust as needed
+temperature_threshold <- 20   # Adjust as needed
+
+# Create a new column to indicate if irrigation is needed
+filtered_data <- filtered_data %>%
+  mutate(irrigation_needed = ifelse(soil_moisture_m3_m3_VWC < moisture_threshold & 
+                                      temp_C > temperature_threshold, 
+                                    "Yes", "No"))
+
+# Set the order of Treatment levels
+filtered_data$Treatment <- factor(filtered_data$Treatment, levels = c("25_kPa", "50_kPa", "50_kPa_WM", "75_kPa", "100_kPa"))
+
+# Define custom x-axis breaks and labels
+custom_dates <- as.Date(c("2023-12-13", "2024-01-13", "2024-02-13", "2024-03-13", "2024-04-13", "2024-05-13"))
+
+# Create the plot with specified x-axis breaks and labels
+ggplot(filtered_data, aes(x = Date, y = soil_moisture_m3_m3_VWC, color = Varieties, fill = Varieties)) +
+  # Add geom_rect to highlight irrigation needed areas
+  geom_rect(data = filtered_data %>% filter(irrigation_needed == "Yes"), 
+            aes(xmin = Date - 0.5, xmax = Date + 0.5, ymin = 0.24, ymax = 0.38), 
+            fill = "lightblue", alpha = 0.5, inherit.aes = FALSE) +
+  geom_point(aes(shape = irrigation_needed), size = 3, alpha = 0.9) +
+  geom_line() +
+  geom_line(aes(y = temp_C * (0.01)), color = "red") +  # Scale temp_C for the secondary axis
+  facet_wrap(~ Treatment, ncol = 1) +
+  labs(
+    title = "",
+    x = "Date",
+    y = "Soil Moisture (m³/m³ VWC)"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_text(size = 16), 
+    axis.title.x = element_text(size = 16, face = "bold", color = "black"), 
+    axis.title.y = element_text(size = 16, face = "bold", color = "black"), 
+    axis.text.x = element_text(size = 16, color = "black"), 
+    axis.text.y = element_text(size = 16, color = "black"), 
+    strip.text = element_text(size = 16, color = "black")
+  ) +
+  scale_x_date(breaks = custom_dates, labels = scales::date_format("%m/%d/%Y")) +
+  scale_y_continuous(
+    limits = c(0.24, 0.38),
+    #sec.axis = sec_axis(trans = ~ (. - 0.24) * (30 - 10) / (0.38 - 0.24) + 10,  # Linear transformation
+    #name = "Temperature (°C)", 
+    #breaks = c(10, 20, 30))  # Set specific breaks
+  )
+##################################################################### #
+##################################################################### #
+##################################################################### #
+
+# COMPARISONS
+# Read the Excel file
+data <- read_excel("zzzzzz_comparisons.xlsx", sheet = "Sheet2")
+
+# Select relevant columns and reshape data for easier plotting
+filtered_data <- data %>%
+  select(Date, Treatment, Hornet_WP, Hornet_photosynthesis, 
+         MataHari_WP, MataHari_photosynthesis, 
+         Amadea_WP, Amadea_photosynthesis) %>%
+  pivot_longer(cols = starts_with("Hornet") | starts_with("MataHari") | starts_with("Amadea"),
+               names_to = c("Type", ".value"),
+               names_sep = "_")
+
+# Remove rows with NA values
+filtered_data <- na.omit(filtered_data)
+
+# Create a scatter plot with regression lines for all treatments
+ggplot(filtered_data) +
+  geom_point(aes(x = WP, y = photosynthesis, color = Type)) +
+  geom_smooth(aes(x = WP, y = photosynthesis, color = Type), method = "lm", se = FALSE) +
+  labs(title = "",
+       x = "WP",
+       y = "Photosynthesis") +
+  facet_wrap(~ Type, scales = "free") +
+  scale_x_continuous(breaks = seq(-1600, -400, by = 400), limits = c(-1600, -400)) +
+  scale_y_continuous(breaks = c(-10, -5, 0, 6, 12), limits = c(-10, 12)) +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_text(size = 16), 
+    axis.title.x = element_text(size = 16, face = "bold", color = "black"), 
+    axis.title.y = element_text(size = 16, face = "bold", color = "black"), 
+    axis.text.x = element_text(size = 16, color = "black"), 
+    axis.text.y = element_text(size = 16, color = "black"), 
+    strip.text = element_text(size = 16, color = "black")
+  )
+##################################################################### #
+##################################################################### #
+##################################################################### #
+
+# PREDICTION OF PHOTOSYNTHESIS, CONDUCTACNE AND TRANSPIRATION
+# Read data from the Excel file
+predict_photo_data <- read_excel("zzzzzz_drought_comparisons.xlsx", sheet = "Sheet6")
+
+# Convert onion_varieties to a factor if not already
+predict_photo_data$onion_varieties <- factor(predict_photo_data$onion_varieties, 
+                                             levels = c("Amadea", "Hornet", "MataHari"))
+
+# Fit the multiple linear regression model
+model <- lm(avg_photosynthesis ~ water_potential + onion_varieties, data = predict_photo_data)
+
+# Display model summary (coefficients, R-squared, etc.)
+summary(model)
+
+# Calculate predictions using the model
+predictions <- predict(model, newdata = predict_photo_data)
+
+# Add predictions to the dataframe
+predict_photo_data$predicted <- predictions
+
+# Plot Water Potential vs Observed Photosynthesis with labels
+ggplot(predict_photo_data, aes(x = water_potential, y = avg_photosynthesis, color = onion_varieties)) +
+  geom_point(size = 4) +  # Increased size of points for better visibility
+  geom_text(aes(label = round(avg_photosynthesis, 2)), 
+            hjust = 1.5, vjust = 0.5, size = 4, color = "black") +  # Adding labels for observed data
+  labs(title = "Observed Photosynthesis", 
+       x = "Water Potential", 
+       y = "Observed Photosynthesis") +
+  theme_minimal() +
+  scale_color_manual(values = c("Amadea" = "#1f77b4", "Hornet" = "#ff7f0e", "MataHari" = "#2ca02c")) + 
+  theme(legend.title = element_blank(), 
+        legend.text = element_text(size = 14),  # Larger legend text for better readability
+        axis.title = element_text(size = 14),  # Larger axis title text
+        axis.text = element_text(size = 12)) +  # Larger axis label text
+  theme(legend.position = "top")  # Position the legend at the top
+
+# Plot Water Potential vs Predicted Photosynthesis with labels
+ggplot(predict_photo_data, aes(x = water_potential, y = predicted, color = onion_varieties)) +
+  geom_point(size = 4) +  # Increased size of points for better visibility
+  geom_text(aes(label = round(predicted, 2)), 
+            hjust = 1.5, vjust = 0.5, size = 4, color = "black") +  # Adding labels for predicted data
+  labs(title = "Predicted Photosynthesis", 
+       x = "Water Potential", 
+       y = "Predicted Photosynthesis") +
+  theme_minimal() +
+  scale_color_manual(values = c("Amadea" = "#1f77b4", "Hornet" = "#ff7f0e", "MataHari" = "#2ca02c")) + 
+  theme(legend.title = element_blank(), 
+        legend.text = element_text(size = 14),  # Larger legend text for better readability
+        axis.title = element_text(size = 14),  # Larger axis title text
+        axis.text = element_text(size = 12)) +  # Larger axis label text
+  theme(legend.position = "top")  # Position the legend at the top
+##################################################################### #
+##################################################################### #
+##################################################################### #
+
+#GRAPHICAL ABSTRACT
+library(ggplot2)
+library(ggrepel)
+
+# Create the original data frame
+data <- data.frame(
+  Date = as.Date(c("2024-03-18", "2024-03-20", "2024-03-25", "2024-03-28", "2024-04-01", "2024-04-03", 
+                   "2024-04-08", "2024-04-09", "2024-04-12", "2024-04-18", "2024-04-22", "2024-04-24", "2024-04-30")),
+  Hornet_irrigation_25kPa = c("2:30-4:45 pm", "8 am-5 pm", NA, "2-8 pm", "8 am-5 pm", NA, "6:45-11:30 pm", "8 am-2:45 pm", 
+                              "8 am-8 pm", NA, "8:30 am - 7:30 pm", NA, NA),
+  MataHari_irrigation_25kPa = c("2:30-4:45 pm", "8 am-5 pm", NA, NA, "8 am-5 pm", "5 pm-8 am", "6:45-11:30 pm", "8 am-2:45 pm", 
+                                "8 am-8 pm", "8 am-8 pm", "8:30 am - 7:30 pm", "11 am-9:40 pm", NA),
+  Amadea_irrigation_25kPa = c("2:30-4:45 pm", "8 am-5 pm", "2-8 pm", "8 am-5 pm", "5-10 pm", "6:45-11:30 pm", "8 am-2:45 pm", 
+                              "8 am-8 pm", "5 pm-8 am", "8 am-8 pm", "8:30 am - 7:30 pm", "11 am-9:40 pm", NA),
+  
+  Hornet_irrigation_50kPa = c("2:30-4:45 pm", "8 am-5 pm", "9 am-5 pm", "2-8 pm", "8 am-5 pm", "5 pm-8 am", "6:45-11:30 pm", 
+                              "8 am-2:45 pm", "8 am-8 pm", "8 am-8 pm", "8:30 am - 7:50 pm", "8:30 am - 7:30 pm", NA),
+  MataHari_irrigation_50kPa = c("2:30-4:45 pm", "8 am-5 pm", NA, NA, "8 am-5 pm", "5 pm-8 am", "6:45-11:30 pm", "8 am-2:45 pm", 
+                                "8 am-8 pm", "8 am-8 pm", "8:30 am - 7:50 pm", "11 am-9:40 pm", NA),
+  Amadea_irrigation_50kPa = c("2:30-4:45 pm", "8 am-5 pm", "9 am-5 pm", "2-8 pm", "8 am-5 pm", "5 pm-8 am", "6:45-11:30 pm", 
+                              "8 am-2:45 pm", "8 am-8 pm", "8 am-8 pm", "8:30 am - 7:50 pm", "11 am-9:40 pm", NA)
+)
+
+# Reshape data to long format, treating each treatment as a separate case
+data_long <- data.frame(
+  Date = rep(data$Date, 2),  # Repeat dates for each treatment
+  Treatment = rep(c("-25 kPa", "-50 kPa"), each = nrow(data)),  # Treatment column
+  Genotype = rep(c("Hornet", "MataHari", "Amadea"), times = 2, each = nrow(data)),  # Genotype column
+  Irrigation_Time = c(as.vector(data$Hornet_irrigation_25kPa), 
+                      as.vector(data$Hornet_irrigation_50kPa), 
+                      as.vector(data$MataHari_irrigation_25kPa), 
+                      as.vector(data$MataHari_irrigation_50kPa),
+                      as.vector(data$Amadea_irrigation_25kPa),
+                      as.vector(data$Amadea_irrigation_50kPa))
+)
+
+# Plot
+ggplot(data_long) +
+  # Add vertical lines at each irrigation date
+  geom_vline(aes(xintercept = as.numeric(Date)), color = "gray", linetype = "dashed") +
+  
+  # Add text for irrigation times
+  geom_text_repel(aes(x = Date, y = as.numeric(factor(Genotype)), label = Irrigation_Time, color = Treatment),
+                  size = 4, hjust = 0, fontface = "italic", box.padding = 0.35, point.padding = 0.5, 
+                  segment.color = "gray", direction = "y") +
+  
+  # Y-axis for genotypes
+  scale_y_continuous(breaks = c(1, 2, 3), labels = c("Hornet", "MataHari", "Amadea")) +  
+  # Improve x-axis date format and spacing
+  scale_x_date(date_labels = "%b %d", date_breaks = "3 days") +  
+  # Refined theme with no grid, clearer text, and professional appearance
+  theme_minimal(base_size = 14) +
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text.x = element_text(angle = 45, hjust = 1, color = "black", size = 10),
+    axis.text.y = element_text(color = "black", size = 12),
+    axis.title = element_blank(),
+    plot.margin = margin(20, 20, 20, 20),
+    plot.background = element_rect(fill = "white", color = "black")
+  ) +
+  # Add x and y axis labels for clarity
+  labs(x = "Irrigation Dates", y = "Genotypes") +
+  scale_color_manual(values = c("-25 kPa" = "darkblue", "-50 kPa" = "darkred"))
+##################################################################### #
+##################################################################### #
+##################################################################### #
+
+#PREDICTION - 1
+# Load necessary libraries
+library(dplyr)
+library(ggplot2)
+library(readr)
+library(lubridate)
+
+# Load the data from the CSV file
+data <- read.csv("Book1.csv")
+
+# Convert the Date column to Date format
+data$Date <- as.Date(data$Date, format = "%m/%d/%Y")
+
+# Fit a linear regression model to predict water potential for each variety
+# The formula will include precipitation (pr_mm), solar radiation (srad_MJ_m2_day),
+# maximum and minimum temperature (t_max_C, t_min_C), and soil moisture (soil_moisture_obs_m3_m3_VWC) as predictors.
+
+# Model for Hornet water potential
+model_hornet <- lm(wat_pot_Hornet_kPa ~ pr_mm + srad_MJ_m2_day + t_max_C + t_min_C + soil_moisture_obs_m3_m3_VWC, data = data)
+summary(model_hornet)
+
+# Model for MataHari water potential
+model_matahari <- lm(wat_pot_MataHari_kPa ~ pr_mm + srad_MJ_m2_day + t_max_C + t_min_C + soil_moisture_obs_m3_m3_VWC, data = data)
+summary(model_matahari)
+
+# Model for Amadea water potential
+model_amadea <- lm(wat_pot_Amadea_kPa ~ pr_mm + srad_MJ_m2_day + t_max_C + t_min_C + soil_moisture_obs_m3_m3_VWC, data = data)
+summary(model_amadea)
+
+# Now use the models to predict the water potential for each variety
+data <- data %>%
+  mutate(
+    # Predicted water potentials for each variety
+    pred_wat_pot_Hornet_kPa = predict(model_hornet, newdata = data),
+    pred_wat_pot_MataHari_kPa = predict(model_matahari, newdata = data),
+    pred_wat_pot_Amadea_kPa = predict(model_amadea, newdata = data)
+  )
+
+# Optional: Calculate the difference between observed and predicted values
+data <- data %>%
+  mutate(
+    diff_Hornet = wat_pot_Hornet_kPa - pred_wat_pot_Hornet_kPa,
+    diff_MataHari = wat_pot_MataHari_kPa - pred_wat_pot_MataHari_kPa,
+    diff_Amadea = wat_pot_Amadea_kPa - pred_wat_pot_Amadea_kPa
+  )
+
+# Save the updated dataset with predictions and differences to a new file
+write.csv(data, "predicted_file.csv", row.names = FALSE)
+
+# Define the custom breaks for the x-axis
+custom_breaks <- as.Date(c("2023-12-12", "2024-01-12", "2024-02-12", "2024-03-12", "2024-04-12", "2024-05-12"))
+
+# Optional: Plot comparison of observed and predicted water potential for each variety
+
+# Plot for Hornet
+ggplot(data, aes(x = Date)) +
+  geom_line(aes(y = wat_pot_Hornet_kPa, color = "Observed Hornet")) +
+  geom_line(aes(y = pred_wat_pot_Hornet_kPa, color = "Predicted Hornet")) +
+  ggtitle("Hornet_50_WM_kpa") +
+  labs(x = "Date", y = "Water Potential (kPa)") +
+  scale_x_date(breaks = custom_breaks, date_labels = "%m/%d/%Y") +
+  scale_y_continuous(breaks = c(0, -50, -100, -150, -200), limits = c(-200, 0)) +
+  theme_minimal() +
+  theme(legend.title = element_blank())
+
+# Plot for MataHari
+ggplot(data, aes(x = Date)) +
+  geom_line(aes(y = wat_pot_MataHari_kPa, color = "Observed MataHari")) +
+  geom_line(aes(y = pred_wat_pot_MataHari_kPa, color = "Predicted MataHari")) +
+  ggtitle("MataHari_50_WM_kpa") +
+  labs(x = "Date", y = "Water Potential (kPa)") +
+  scale_x_date(breaks = custom_breaks, date_labels = "%m/%d/%Y") +
+  scale_y_continuous(breaks = c(0, -50, -100, -150, -200), limits = c(-200, 0)) +
+  theme_minimal() +
+  theme(legend.title = element_blank())
+
+# Plot for Amadea
+ggplot(data, aes(x = Date)) +
+  geom_line(aes(y = wat_pot_Amadea_kPa, color = "Observed Amadea")) +
+  geom_line(aes(y = pred_wat_pot_Amadea_kPa, color = "Predicted Amadea")) +
+  ggtitle("Amadea_50_WM_kpa") +
+  labs(x = "Date", y = "Water Potential (kPa)") +
+  scale_x_date(breaks = custom_breaks, date_labels = "%m/%d/%Y") +
+  scale_y_continuous(breaks = c(0, -50, -100, -150, -200), limits = c(-200, 0)) +
+  theme_minimal() +
+  theme(legend.title = element_blank())
+##################################################################### #
+
+#PREDICTION - 2
+library(readxl)
+library(caret)
+library(dplyr)
+library(writexl)
+
+# Load data
+data <- read_excel("drought_comparisons.xlsx", sheet = "ET_calculate3")
+
+# Ensure Date is in Date format
+data$Date <- as.Date(data$Date, format="%m/%d/%Y")
+
+# Inverse relationship transformation for water potential
+data$Inv_ET_Hornet <- 1 / (data$irrigation_Hornet_mm + 1)
+data$Inv_ET_MH <- 1 / (data$irrigation_MH_mm + 1)
+data$Inv_ET_Amadea <- 1 / (data$irrigation_Amadea_mm + 1)
+
+# Include irrigation as a direct relationship factor
+data$Hornet_irrigation[is.na(data$Hornet_irrigation)] <- 0
+data$MH_irrigation[is.na(data$MH_irrigation)] <- 0
+data$Amadea_irrigation[is.na(data$Amadea_irrigation)] <- 0
+
+# Train predictive models using inverse ET relationship and irrigation
+set.seed(123)
+hornet_model <- train(Hornet_wat_pot_kpa ~ Inv_ET_Hornet + Hornet_irrigation + Date, data = data, method = "lm")
+mh_model <- train(MH_wat_pot_kPa ~ Inv_ET_MH + MH_irrigation + Date, data = data, method = "lm")
+amadea_model <- train(Amadea_wat_pot_kPa ~ Inv_ET_Amadea + Amadea_irrigation + Date, data = data, method = "lm")
+
+# Predict water potential for each variety
+data$Pred_Hornet_wat_pot_kpa <- predict(hornet_model, newdata = data)
+data$Pred_MH_wat_pot_kPa <- predict(mh_model, newdata = data)
+data$Pred_Amadea_wat_pot_kPa <- predict(amadea_model, newdata = data)
+
+# Save the predictions back to an Excel file
+write.csv(data, "z_predictions.csv")
+##################################################################### #
+
+#PREDICTION - 3
+# Load data
+data <- read_excel("drought_comparisons.xlsx", sheet = "ET_calculate3")
+
+# Ensure Date is in Date format
+data$Date <- as.Date(data$Date, format="%m/%d/%Y")
+
+# Inverse relationship transformation for water potential
+data$Inv_ET_Hornet <- 1 / (data$irrigation_Hornet_mm + 1)
+
+# Include irrigation as a direct relationship factor
+data$Hornet_irrigation[is.na(data$Hornet_irrigation)] <- 0
+
+# Remove non-practical jumps in Hornet_wat_pot_kpa values (e.g., large daily jumps)
+data <- data[abs(diff(c(NA, data$Hornet_wat_pot_kpa))) < 25, ]
+
+# Remove rows with missing values in the columns used for training the model
+data <- data[!is.na(data$Hornet_wat_pot_kpa) & !is.na(data$Inv_ET_Hornet) & !is.na(data$Hornet_irrigation), ]
+
+# Train predictive models using inverse ET relationship and irrigation
+set.seed(123)
+hornet_model <- train(Hornet_wat_pot_kpa ~ Inv_ET_Hornet + Hornet_irrigation + Date, data = data, method = "lm")
+
+# Predict water potential for each variety
+data$Pred_Hornet_wat_pot_kpa <- predict(hornet_model, newdata = data)
+
+# Save the predictions back to an Excel file
+write.csv(data, "z_predictions.csv")
+##################################################################### #
+
+#PREDICTION - 4 - RANDOM FOREST
+# Load necessary libraries
+library(tidyverse)
+library(caret)
+library(randomForest)
+library(readxl)
+
+# Load data
+data <- read_excel("drought_comparisons.xlsx", sheet = "ET_calculate3")
+
+# Ensure Date is in Date format
+data$Date <- as.Date(data$Date, format="%m/%d/%Y")
+
+# Inverse relationship transformation for water potential
+data$Inv_ET_Hornet <- 1 / (data$irrigation_Hornet_mm + 1)
+
+# Include irrigation as a direct relationship factor
+data$Hornet_irrigation[is.na(data$Hornet_irrigation)] <- 0
+
+# Remove non-practical jumps in Hornet_wat_pot_kpa values (e.g., large daily jumps)
+data <- data[abs(diff(c(NA, data$Hornet_wat_pot_kpa))) < 25, ]
+
+# Remove rows with missing values in the columns used for training the model
+data <- data[!is.na(data$Hornet_wat_pot_kpa) & !is.na(data$Inv_ET_Hornet) & !is.na(data$Hornet_irrigation), ]
+
+# Add interaction terms between irrigation and other predictors (ET and Date)
+data$Interaction_ET_irrigation <- data$Inv_ET_Hornet * data$Hornet_irrigation
+data$Interaction_ET_Date <- data$Inv_ET_Hornet * as.numeric(data$Date)
+
+# Train a Random Forest model to predict water potential (Hornet_wat_pot_kpa)
+set.seed(123)
+hornet_rf_model <- randomForest(Hornet_wat_pot_kpa ~ Inv_ET_Hornet + Hornet_irrigation + Date + Interaction_ET_irrigation + Interaction_ET_Date, 
+                                data = data, 
+                                ntree = 500,  # Number of trees to grow
+                                mtry = 4,     # Number of variables to try at each split
+                                importance = TRUE)
+
+# Predict water potential for each variety using the Random Forest model
+data$Pred_Hornet_wat_pot_kpa <- predict(hornet_rf_model, newdata = data)
+
+# Save the predictions back to an Excel file
+write.csv(data, "z_predictions_rf_with_irrigation.csv")
+
+# Evaluate the performance of the model by comparing observed vs predicted
+observed <- data$Hornet_wat_pot_kpa
+predicted <- data$Pred_Hornet_wat_pot_kpa
+comparison <- data.frame(Observed = observed, Predicted = predicted)
+
+# Calculate performance metrics
+mse <- mean((observed - predicted)^2)  # Mean Squared Error
+rmse <- sqrt(mse)                      # Root Mean Squared Error
+mae <- mean(abs(observed - predicted))  # Mean Absolute Error
+
+# Print the performance metrics
+cat("Mean Squared Error (MSE):", mse, "\n")
+cat("Root Mean Squared Error (RMSE):", rmse, "\n")
+cat("Mean Absolute Error (MAE):", mae, "\n")
+##################################################################### #
+
+#PREDICTION - 5 - RANDOM FOREST
+library(readxl)
+library(dplyr)
+library(tidyr)
+library(lubridate)
+library(caret)
+library(openxlsx)
+
+# Load the data
+data <- read_excel("drought_comparisons.xlsx", sheet = "ET_calculate3")
+
+# Filter the data for the relevant columns and the specified date range
+filtered_data <- data %>%
+  select(Date, Treatment, Hornet_wat_pot_kpa, Hornet_ET, Hornet_irrigation_mm, soil_moisture, pr_mm, srad_MJ_m2_day, t_max_C, t_min_C) %>%
+  filter(Date >= as.Date("2024-03-01") & Date <= as.Date("2024-04-30")) %>%
+  na.omit()  # Remove rows with any missing values
+
+# Standardize the input variables
+filtered_data <- filtered_data %>%
+  mutate(across(c(Hornet_ET, Hornet_irrigation_mm, soil_moisture, pr_mm, srad_MJ_m2_day, t_max_C, t_min_C), 
+                ~ scale(.) %>% as.vector()))  # Standardize and convert to vector
+
+# Prepare the data for modeling
+model_data <- filtered_data %>%
+  mutate(Date = as.Date(Date)) %>%
+  group_by(Treatment) %>%
+  summarise(across(everything(), mean, na.rm = TRUE), .groups = 'drop')
+
+# Train a linear model for predicting Hornet water potential
+model <- train(Hornet_wat_pot_kpa ~ Hornet_ET + Hornet_irrigation_mm + soil_moisture + pr_mm + srad_MJ_m2_day + 
+                 t_max_C + t_min_C, 
+               data = model_data, method = "lm")
+
+# Create a new data frame for predictions with the specified variables
+prediction_data <- expand.grid(
+  Hornet_ET = seq(min(filtered_data$Hornet_ET, na.rm = TRUE), max(filtered_data$Hornet_ET, na.rm = TRUE), length.out = 5),
+  Hornet_irrigation_mm = seq(min(filtered_data$Hornet_irrigation_mm, na.rm = TRUE), max(filtered_data$Hornet_irrigation_mm, na.rm = TRUE), length.out = 5),
+  soil_moisture = seq(min(filtered_data$soil_moisture, na.rm = TRUE), max(filtered_data$soil_moisture, na.rm = TRUE), length.out = 5),
+  pr_mm = seq(min(filtered_data$pr_mm, na.rm = TRUE), max(filtered_data$pr_mm, na.rm = TRUE), length.out = 5),
+  srad_MJ_m2_day = seq(min(filtered_data$srad_MJ_m2_day, na.rm = TRUE), max(filtered_data$srad_MJ_m2_day, na.rm = TRUE), length.out = 5),
+  t_max_C = seq(min(filtered_data$t_max_C, na.rm = TRUE), max(filtered_data$t_max_C, na.rm = TRUE), length.out = 5),
+  t_min_C = seq(min(filtered_data$t_min_C, na.rm = TRUE), max(filtered_data$t_min_C, na.rm = TRUE), length.out = 5)
+)
+
+# Make predictions using the trained model
+predictions <- predict(model, newdata = prediction_data)
+
+# Combine predictions with the prediction data
+output <- cbind(prediction_data, Hornet_wat_pot_kpa = predictions)
+
+# Save the output to a CSV file
+write.csv(output, "z_predicted.csv", row.names = FALSE)
+##################################################################### #
+##################################################################### #
+##################################################################### #
+
+# P-VALUES FOR YIELD AND BULBING TRAITS USING 0.05 THRESHOLD
+
+# Load required libraries
+library(readxl)
+library(dplyr)
+
+# Read the Excel data
+data <- read_excel("z_delete_yield_LAI.xlsx", sheet = "delete")
+
+# Clean the YIELD_ADJ_KG_HA column (remove letter suffixes)
+data$YIELD_ADJ_KG_HA <- as.numeric(gsub("[^0-9\\.]", "", data$YIELD_ADJ_KG_HA))
+
+# List of numeric variables to test
+vars <- c("YIELD_ADJ_KG_HA", "SWP_kPa", "S_WT_P", "S_N_P", "M_WT_P", "M_N_P", 
+          "LARGE_WT_PERCENT", "L_N_P", "JUMBO_WT_PERCENT", "J_N_P", "SINGLE_CENTER_PERCENT")
+
+# Initialize a data frame to store p-values
+results <- data.frame(
+  Variable = character(),
+  P_value_Treatments = numeric(),
+  P_value_Varieties = numeric(),
+  stringsAsFactors = FALSE
+)
+
+# Loop through variables and run ANOVA
+for (var in vars) {
+  # Build formulas
+  formula_treatment <- as.formula(paste(var, "~ TREATMENTS"))
+  formula_variety <- as.formula(paste(var, "~ VARIETIES"))
+  
+  # Run ANOVA
+  aov_treat <- aov(formula_treatment, data = data)
+  aov_var <- aov(formula_variety, data = data)
+  
+  # Get p-values from summary
+  p_treat <- summary(aov_treat)[[1]][["Pr(>F)"]][1]
+  p_var <- summary(aov_var)[[1]][["Pr(>F)"]][1]
+  
+  # Append to results
+  results <- rbind(results, data.frame(
+    Variable = var,
+    P_value_Treatments = round(p_treat, 4),
+    P_value_Varieties = round(p_var, 4)
+  ))
+}
+
+# Display results with significance threshold 0.05
+print("P-values for each variable with respect to Treatments and Varieties:")
+print(results)
+
+cat("\nSignificant results (p < 0.05):\n")
+print(filter(results, P_value_Treatments < 0.05 | P_value_Varieties < 0.05))
+##################################################################### #
+
+# P-VALUES FOR YIELD AND BULBING TRAITS USING 0.10 THRESHOLD
+
+# Load libraries
+library(readxl)
+library(dplyr)
+
+# Read data from the Excel file
+data <- read_excel("z_delete_yield_LAI.xlsx", sheet = "delete")
+
+# Variables to test
+variables <- c("YIELD_ADJ_KG_HA", "SWP_kPa", "S_WT_P", "S_N_P", "M_WT_P", "M_N_P",
+               "LARGE_WT_PERCENT", "L_N_P", "JUMBO_WT_PERCENT", "J_N_P", "SINGLE_CENTER_PERCENT")
+
+# Initialize result storage
+results <- data.frame(
+  Variable = character(),
+  P_value_Treatments = numeric(),
+  P_value_Varieties = numeric(),
+  stringsAsFactors = FALSE
+)
+
+# Loop through variables, perform ANOVA and extract p-values
+for (var in variables) {
+  formula <- as.formula(paste(var, "~ TREATMENTS + VARIETIES"))
+  aov_result <- aov(formula, data = data)
+  anova_summary <- summary(aov_result)[[1]]
+  
+  p_treatments <- anova_summary["TREATMENTS", "Pr(>F)"]
+  p_varieties <- anova_summary["VARIETIES", "Pr(>F)"]
+  
+  results <- rbind(results, data.frame(
+    Variable = var,
+    P_value_Treatments = p_treatments,
+    P_value_Varieties = p_varieties
+  ))
+}
+
+# Set p-value threshold to 1.0 (include all results)
+threshold <- 1.0
+
+cat("\nResults with p-values less than or equal to", threshold, ":\n")
+print(filter(results, P_value_Treatments <= threshold | P_value_Varieties <= threshold))
+##################################################################### #
+
+# LSD - VALUES FOR YIELD AND BULBING TRAITS
+
+# Load required libraries
+library(readxl)
+library(dplyr)
+library(agricolae)
+
+# Read data from Excel file
+data <- read_excel("z_delete_yield_LAI.xlsx", sheet = "delete")
+
+# Variables to analyze
+vars <- c("YIELD_ADJ_KG_HA", "SWP_kPa", "S_WT_P", "S_N_P", "M_WT_P", "M_N_P", 
+          "LARGE_WT_PERCENT", "L_N_P", "JUMBO_WT_PERCENT", "J_N_P", "SINGLE_CENTER_PERCENT")
+
+# Initialize results data frame to store LSD and groups
+results_LSD <- data.frame(
+  Variable = character(),
+  LSD_Treatments = numeric(),
+  Groups_Treatments = character(),
+  LSD_Varieties = numeric(),
+  Groups_Varieties = character(),
+  stringsAsFactors = FALSE
+)
+
+# Loop over each variable
+for (v in vars) {
+  # ANOVA model for Treatments
+  model_treat <- aov(as.formula(paste(v, "~ TREATMENTS")), data = data)
+  lsd_treat <- tryCatch({
+    lsd_out <- LSD.test(model_treat, "TREATMENTS", group=TRUE)
+    list(
+      LSD = lsd_out$statistics$LSD,
+      Groups = paste(names(lsd_out$groups), lsd_out$groups$groups, sep = ":", collapse = ", ")
+    )
+  }, error = function(e) list(LSD = NA, Groups = NA))
+  
+  # ANOVA model for Varieties
+  model_var <- aov(as.formula(paste(v, "~ VARIETIES")), data = data)
+  lsd_var <- tryCatch({
+    lsd_out <- LSD.test(model_var, "VARIETIES", group=TRUE)
+    list(
+      LSD = lsd_out$statistics$LSD,
+      Groups = paste(names(lsd_out$groups), lsd_out$groups$groups, sep = ":", collapse = ", ")
+    )
+  }, error = function(e) list(LSD = NA, Groups = NA))
+  
+  # Append results
+  results_LSD <- rbind(results_LSD, data.frame(
+    Variable = v,
+    LSD_Treatments = lsd_treat$LSD,
+    Groups_Treatments = lsd_treat$Groups,
+    LSD_Varieties = lsd_var$LSD,
+    Groups_Varieties = lsd_var$Groups
+  ))
+}
+
+# Print LSD results with group letters
+print(results_LSD)
+##################################################################### #
+##################################################################### #
+##################################################################### #
